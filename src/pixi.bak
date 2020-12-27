@@ -1,0 +1,19 @@
+// let app = new Application({
+//   resizeTo: window,
+//   // antialias: true,
+//   // resolution: window.devicePixelRatio,
+// });
+// app.renderer.backgroundColor = 0xffffff;
+// const width = app.renderer.view.width;
+// const height = app.renderer.view.height;
+// document.body.appendChild(app.view);
+
+// let circ = new Graphics();
+// circ.beginFill(0x66ccff);
+// circ.lineStyle(0);
+// circ.drawCircle(0, 0, 100);
+// circ.endFill();
+
+// circ.x = width / 2;
+// circ.y = height / 2;
+// app.stage.addChild(circ);
