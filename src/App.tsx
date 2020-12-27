@@ -253,8 +253,8 @@ class ChargeViewer {
       const wy = this.sys.pos.get(i, 1);
       const [sx, sy] = this.toScreen(wx, wy);
 
-      this.partSprites[i].translation.set(sx, sy);
-      this.partSprites[i].scale = this.scale;
+      // this.partSprites[i].translation.set(sx, sy);
+      // this.partSprites[i].scale = this.scale;
     }
   }
 }
@@ -271,7 +271,7 @@ function initTwo() {
   const simWidth = two.width / scale;
   const simHeight = two.height / scale;
 
-  let system = new ChargeSystem(200, simWidth, simHeight);
+  let system = new ChargeSystem(600, simWidth, simHeight);
   let viewer = new ChargeViewer(system, two, scale);
 
   var stats = new Stats();
