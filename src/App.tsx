@@ -1,15 +1,12 @@
 import React, { useEffect } from "react";
 import './App.css';
 
-import cwise from "cwise";
-import ndarray from "ndarray";
-import ops from "ndarray-ops";
-
 import { vec2 } from "gl-matrix";
 import { glMatrix } from "gl-matrix";
 
 import Two, { Vector } from "twojs-ts";
 import Stats from "stats.js";
+import { number } from "mathjs";
 
 glMatrix.setMatrixArrayType(Array);
 
@@ -29,19 +26,12 @@ function clearCanvas(root: HTMLElement) {
   }
 }
 
-const muladdseq = cwise({
-  args: ["array", "array", "scalar"],
-  body: function (a, b, s) {
-    a += b * s;
-  },
-});
-
 class ChargeSystem {
   // State
-  pos: ndarray;
-  oldPos: ndarray;
-  charge: ndarray;
-  invMass: ndarray;
+  pos: Array<vec2>;
+  oldPos: Array<vec2>;
+  charge: Array<number>;
+  invMass: Array<number>;
 
   // Simulation params
   nParts: number;
@@ -51,101 +41,94 @@ class ChargeSystem {
   bmin: vec2;
 
   // Temporaries
-  force: ndarray;
-  acc: ndarray; // Acceleration
+  force: Array<vec2>;
 
   constructor(maxParts: number, width: number, height: number) {
     this.nParts = maxParts; // Could be less than max
     this.maxParts = maxParts;
+    
     this.rad = 1;
+
     this.bmax = vec2.fromValues(width / 2 - this.rad, height / 2 - this.rad);
     this.bmin = vec2.create();
     vec2.scale(this.bmin, this.bmax, -1);
 
-    const dim = 2;
-
-    this.pos = ndarray(new Float64Array(maxParts * dim), [maxParts, dim]);
+    this.pos = new Array<vec2>(maxParts);
+    this.oldPos = new Array<vec2>(maxParts);
     for (let i = 0; i < maxParts; i++) {
-      this.pos.set(i, 0, ((i / 10) >> 0) * 2); // x
-      this.pos.set(i, 1, (i % 10) * 2); // y
+      this.pos[i] = vec2.fromValues(((i / 10) >> 0) * 2, (i % 10) * 2); // grid
+
+      // Copy current pos into old pos
+      this.oldPos[i] = vec2.clone(this.pos[i]);
     }
 
-    this.oldPos = ndarray(new Float64Array(maxParts * dim), [maxParts, dim]);
-    ops.assign(this.oldPos, this.pos);
+    this.charge = new Array<number>(maxParts);
+    this.charge.fill(-1.0);
 
-    this.charge = ndarray(new Float64Array(maxParts), [maxParts]);
-    ops.assigns(this.charge, -1);
+    this.invMass = new Array<number>(maxParts);
+    this.invMass.fill(1.0);
 
-    this.invMass = ndarray(new Float64Array(maxParts), [maxParts]);
-    ops.assigns(this.invMass, 1.0);
-
-    this.acc = ndarray(new Float64Array(maxParts * dim), [maxParts, dim]);
-    this.force = ndarray(new Float64Array(maxParts * dim), [maxParts, dim]);
+    this.force = new Array<vec2>(maxParts);
+    for (let i = 0; i < this.nParts; i++) {
+      this.force[i] = vec2.fromValues(0.0, 0.0);
+    }
   }
 
   attractParticles(point: vec2, strength: number) {
     for (let i = 0; i < this.nParts; i++) {
-      const pi = vec2.fromValues(this.pos.get(i, 0), this.pos.get(i, 1));
+      const f = vec2.create();
+      vec2.sub(f, point, this.pos[i]);
+      vec2.normalize(f, f);
+      vec2.scale(f, f, strength);
 
-      const force = vec2.create();
-      vec2.sub(force, point, pi);
-      vec2.normalize(force, force);
-      vec2.scale(force, force, strength);
-
-      this.force.set(i, 0, force[0]);
-      this.force.set(i, 1, force[1]);
+      vec2.add(this.force[i], this.force[i], f);
     }
   }
 
   applyCoulombForces() {
     for (let i = 0; i < this.nParts; i++) {
-      const pi = vec2.fromValues(this.pos.get(i, 0), this.pos.get(i, 1));
-      const qi = this.charge.get(i);
-
+      const qi = this.charge[i];
+      
       for (let j = i + 1; j < this.nParts; j++) {
-        const pj = vec2.fromValues(this.pos.get(j, 0), this.pos.get(j, 1));
-        const qj = this.charge.get(j);
-
-        const magnitude = ((qi * qj) / vec2.sqrDist(pi, pj)) * 50;
-
+        const qj = this.charge[j];
+        
+        const magnitude = ((qi * qj) / vec2.sqrDist(this.pos[i], this.pos[j])) * 50;
+        
         const offset = vec2.create();
-        vec2.sub(offset, pj, pi); // vec from pi to pj
+        vec2.sub(offset, this.pos[j], this.pos[i]); // vec from pi to pj
         vec2.normalize(offset, offset);
-
+        
         const fi = vec2.create(); // force acting on pi
         vec2.scale(fi, offset, -magnitude);
-
+        
         const fj = vec2.create(); // force acting on pi
         vec2.scale(fj, offset, magnitude);
-
-        this.force.set(i, 0, this.force.get(i, 0) + fi[0]);
-        this.force.set(i, 1, this.force.get(i, 1) + fi[1]);
-
-        this.force.set(j, 0, this.force.get(j, 0) + fj[0]);
-        this.force.set(j, 1, this.force.get(j, 1) + fj[1]);
+        
+        vec2.add(this.force[i], this.force[i], fi);
+        vec2.add(this.force[j], this.force[j], fj);
       }
+    }
+  }
+  
+  applyGravity() {
+    const fGrav = vec2.fromValues(0.0, 0.0);
+    for (let i = 0; i < this.nParts; i++) {
+      vec2.add(this.force[i], this.force[i], fGrav);
     }
   }
 
   step(dt: number) {
     this.applyCoulombForces();
-
-    const fGrav = [0, 0]; // -9.8];
-    // Reset and apply gravity
-    ops.addseq(this.force.pick(null, 0), fGrav[0]);
-    ops.addseq(this.force.pick(null, 1), fGrav[1]);
-    // logSync("force", this.force);
+    this.applyGravity();
 
     // a = F/m
     // Could store result back in F to optimize
     for (let i = 0; i < this.nParts; i++) {
-      const f = vec2.fromValues(this.force.get(i, 0), this.force.get(i, 1));
-      const mInv = this.invMass.get(i);
-      const p0 = vec2.fromValues(this.oldPos.get(i, 0), this.oldPos.get(i, 1));
-      const p1 = vec2.fromValues(this.pos.get(i, 0), this.pos.get(i, 1));
+      const p0 = this.oldPos[i];
+      const p1 = this.pos[i];
 
       let a = vec2.create();
-      vec2.scale(a, f, mInv);
+      vec2.scale(a, this.force[i], this.invMass[i]);
 
       let p2 = vec2.create();
       vec2.scale(p2, p1, 2.0); // 2x_n
@@ -153,27 +136,21 @@ class ChargeSystem {
       vec2.scaleAndAdd(p2, p2, a, dt * dt); // + a_n * t^2
 
       // Update
-      this.pos.set(i, 0, p2[0]);
-      this.pos.set(i, 1, p2[1]);
-
-      this.oldPos.set(i, 0, p1[0]);
-      this.oldPos.set(i, 1, p1[1]);
+      this.pos[i] = p2;
+      this.oldPos[i] = p1;
     }
 
     // collisions
     for (let its = 0; its < 2; its++) {
       for (let i = 0; i < this.nParts; i++) {
         // bounds
-        const pi = vec2.fromValues(this.pos.get(i, 0), this.pos.get(i, 1));
-        vec2.min(pi, pi, this.bmax);
-        vec2.max(pi, pi, this.bmin);
-        this.pos.set(i, 0, pi[0]);
-        this.pos.set(i, 1, pi[1]);
+        vec2.min(this.pos[i], this.pos[i], this.bmax);
+        vec2.max(this.pos[i], this.pos[i], this.bmin);
 
         // particles
         for (let j = i + 1; j < this.nParts; j++) {
-          const pi = vec2.fromValues(this.pos.get(i, 0), this.pos.get(i, 1));
-          const pj = vec2.fromValues(this.pos.get(j, 0), this.pos.get(j, 1));
+          const pi = this.pos[i];
+          const pj = this.pos[j];
 
           const sqrD = vec2.sqrDist(pi, pj);
           // If they are overlapping (assuming constant radius)
@@ -195,18 +172,17 @@ class ChargeSystem {
             vec2.scaleAndAdd(pjNew, mid, offset, -1.0);
 
             // update
-            this.pos.set(j, 0, pjNew[0]);
-            this.pos.set(j, 1, pjNew[1]);
-
-            this.pos.set(i, 0, piNew[0]);
-            this.pos.set(i, 1, piNew[1]);
+            this.pos[i] = piNew;
+            this.pos[j] = pjNew;
           }
         }
       }
     }
 
     // reset forces
-    ops.assigns(this.force, 0.0);
+    for (let i = 0; i < this.nParts; i++) {
+      this.force[i] = vec2.fromValues(0.0, 0.0);
+    }
   }
 }
 
@@ -241,20 +217,18 @@ class ChargeViewer {
     return this.two.makeGroup([circ, rect]);
   }
 
-  toScreen(wx: number, wy: number): [number, number] {
-    const ofstX = this.two.width / 2.0;
-    const ofstY = this.two.height / 2.0;
-    return [wx * this.scale + ofstX, -wy * this.scale + ofstY];
+  toScreen(pWorld: vec2): vec2 {
+    const ofst = vec2.fromValues(this.two.width / 2.0, this.two.height / 2.0);
+    const pScreen = vec2.create();
+    vec2.scaleAndAdd(pScreen, ofst, pWorld, this.scale);
+    return pScreen;
   }
 
   update() {
     for (let i = 0; i < this.sys.nParts; i++) {
-      const wx = this.sys.pos.get(i, 0);
-      const wy = this.sys.pos.get(i, 1);
-      const [sx, sy] = this.toScreen(wx, wy);
-
-      // this.partSprites[i].translation.set(sx, sy);
-      // this.partSprites[i].scale = this.scale;
+      const pScreen = this.toScreen(this.sys.pos[i]);
+      this.partSprites[i].translation.set(pScreen[0], pScreen[1]);
+      this.partSprites[i].scale = this.scale;
     }
   }
 }
@@ -271,7 +245,7 @@ function initTwo() {
   const simWidth = two.width / scale;
   const simHeight = two.height / scale;
 
-  let system = new ChargeSystem(600, simWidth, simHeight);
+  let system = new ChargeSystem(300, simWidth, simHeight);
   let viewer = new ChargeViewer(system, two, scale);
 
   var stats = new Stats();
@@ -281,7 +255,7 @@ function initTwo() {
   two.bind(Two.Events.update, function () {
     stats.begin();
 
-    system.attractParticles(vec2.fromValues(0.1, 0.1), 10);
+    // system.attractParticles(vec2.fromValues(0.1, 0.1), 10);
     system.step(0.05);
 
     viewer.update();
