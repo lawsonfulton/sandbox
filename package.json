@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@testing-library/jest-dom": "^5.11.6",
     "@types/cwise": "^1.0.2",
     "@types/mathjs": "^6.0.9",
     "@types/ndarray": "^1.0.8",
