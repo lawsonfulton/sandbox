@@ -1,5 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import './App.css';
+
+import { Button } from "antd";
+import "./App.css";
 
 import { ChargeViewer } from "./ChargeViewer";
 import { ChargeSystem } from "./ChargeSystem";
@@ -19,55 +22,73 @@ function logSync(...args: any[]) {
   }
 }
 
-function clearCanvas(root: HTMLElement) {
-  var svgs = root.getElementsByTagName("canvas");
-  for (let el of svgs) {
-    root.removeChild(el);
-  }
-}
+const SimulationApp = () => {
+  let ref = useRef() as React.MutableRefObject<HTMLInputElement>;
+  let twoRef = useRef(new Two({fullscreen: true, autostart: true }));
 
-
-function initTwo() {
-  clearCanvas(document.body); // For hot reloading
-
-  let two = new Two({
-    fullscreen: true,
-    autostart: true,
-  }).appendTo(document.body);
+  useEffect(setup, []);
 
   const scale = 16;
-  const simWidth = two.width / scale;
-  const simHeight = two.height / scale;
-
-  let system = new ChargeSystem(200, simWidth, simHeight);
+  const simWidth = twoRef.current.width / scale;
+  const simHeight = twoRef.current.height / scale;
   const showDebug = false;
-  let viewer = new ChargeViewer(system, two, scale, showDebug);
-  // viewer.drawSpatialHash();
+  let systemRef = useRef(new ChargeSystem(100, simWidth, simHeight));
+  let viewerRef = useRef(
+    new ChargeViewer(systemRef.current, twoRef.current, scale, showDebug)
+    );
+    
+  function setup() {
+    let two = twoRef.current;
+    two.appendTo(ref.current);
 
-  var stats = new Stats();
-  stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-  document.body.appendChild(stats.dom);
+    // Add any shapes you'd like here
+    two.bind(Two.Events.update, update);
+    two.bind(Two.Events.resize, resize);
 
-  two.bind(Two.Events.update, function () {
-    stats.begin();
-
-    system.attractParticles(vec2.fromValues(0.1, 0.1), 20); //20);
-    system.step(0.05);
-
-    viewer.update();
-
-    stats.end();
-  });
-}
-
-function App() {
-  useEffect(() => {
-    initTwo();
-  }, []);
+    return function () {
+      // Unmount handler
+      two.unbind(Two.Events.update, update);
+      two.unbind(Two.Events.resize, resize);
+    }; 
+  }
   
+  function resize() {
+    const simWidth = twoRef.current.width / scale;
+    const simHeight = twoRef.current.height / scale;
+    systemRef.current.updateBounds(simWidth, simHeight);
+  }
+
+  function update() {
+    // stats.begin();
+
+    systemRef.current.attractParticles(vec2.fromValues(0.1, 0.1), 20); //20);
+    systemRef.current.step(0.05);
+    
+    viewerRef.current.update();
+    
+    // stats.end();
+  }
+  function click() {
+    systemRef.current.attractParticles(vec2.fromValues(0, 0), 200); //20);
+  }
+  return (
+    <div>
+      <div>
+        <Button type="primary" style={{ position: 'fixed', zIndex:1}} onClick={click}>Test</Button>
+      </div>
+      <div>
+        <div className="stage" ref={ref} />
+      </div>
+    </div>
+  );
+};
+
+
+const App = () => {
   return (
     <div className="Charges">
       <header className="Charges-header"></header>
+      <SimulationApp />
     </div>
   );
 }

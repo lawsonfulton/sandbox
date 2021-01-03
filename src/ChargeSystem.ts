@@ -2,6 +2,7 @@ import { SpatialHash } from "./SpatialHash";
 import { BBox } from "./BBox";
 
 import { vec2 } from "gl-matrix";
+import { number } from "mathjs";
 
 // TODO
 // 1. Make Spatial Hash own the position array so they can't get out of sync
@@ -33,10 +34,7 @@ export class ChargeSystem {
     this.rad = 1;
     this.collisionRad = this.rad * this.rad * 4; // * 3;
 
-    this.bounds = {
-      max: vec2.fromValues(width / 2 - this.rad, height / 2 - this.rad),
-      min: vec2.fromValues(-(width / 2 - this.rad), -(height / 2 - this.rad)),
-    };
+    this.bounds = this.getBounds(width, height);
 
     this.pos = new Array<vec2>(maxParts);
     this.oldPos = new Array<vec2>(maxParts);
@@ -70,6 +68,17 @@ export class ChargeSystem {
       min: vec2.fromValues(-(width / 2) - buffer, -(height / 2) - buffer),
     };
     this.spatial = new SpatialHash(this.pos, cellSize, spatialBounds);
+  }
+
+  getBounds(width: number, height: number): BBox {
+    return {
+      max: vec2.fromValues(width / 2 - this.rad, height / 2 - this.rad),
+      min: vec2.fromValues(-(width / 2 - this.rad), -(height / 2 - this.rad)),
+    };
+  }
+
+  updateBounds(width: number, height: number) {
+    this.bounds = this.getBounds(width, height);
   }
 
   attractParticles(point: vec2, strength: number) {
