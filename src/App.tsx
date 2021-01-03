@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from "react";
+import { Button, Card, Slider } from "antd";
+import { MinusCircleOutlined, PlusCircleOutlined } from "@ant-design/icons";
 import './App.css';
-
-import { Button } from "antd";
-import "./App.css";
 
 import { ChargeViewer } from "./ChargeViewer";
 import { ChargeSystem } from "./ChargeSystem";
@@ -11,37 +10,36 @@ import Two from "twojs-ts";
 import Stats from "stats.js";
 
 import { glMatrix, vec2 } from "gl-matrix";
-glMatrix.setMatrixArrayType(Array);
-
-function logSync(...args: any[]) {
-  try {
-    args = args.map((arg) => JSON.parse(JSON.stringify(arg)));
-    console.log(...args);
-  } catch (error) {
-    console.log("Error trying to console.logSync()", ...args);
-  }
-}
+glMatrix.setMatrixArrayType(Array); // Faster than TypedArray
 
 const SimulationApp = () => {
-  let ref = useRef() as React.MutableRefObject<HTMLInputElement>;
+  // Must use refs to manage simulation state independently from React
+  let stageRef = useRef() as React.MutableRefObject<HTMLInputElement>;
   let twoRef = useRef(new Two({fullscreen: true, autostart: true }));
 
-  useEffect(setup, []);
+  // Simulation uses particles of unit radius by default
+  // The scale constant determines how big the particles appear on screen
+  // Or, the ration between screen space and world space
+  const scale = 14;
 
-  const scale = 16;
+  // Set the bounds of the simulation to be the bounds of the screen scaled
+  // down to world space
   const simWidth = twoRef.current.width / scale;
   const simHeight = twoRef.current.height / scale;
+
   const showDebug = false;
   let systemRef = useRef(new ChargeSystem(100, simWidth, simHeight));
   let viewerRef = useRef(
     new ChargeViewer(systemRef.current, twoRef.current, scale, showDebug)
-    );
+  );
     
+  // One time call to setup function
+  // which sets up callbacks and attaches the two.js stage
+  // to the dom.
+  useEffect(setup, []);
   function setup() {
     let two = twoRef.current;
-    two.appendTo(ref.current);
-
-    // Add any shapes you'd like here
+    two.appendTo(stageRef.current);
     two.bind(Two.Events.update, update);
     two.bind(Two.Events.resize, resize);
 
@@ -52,12 +50,14 @@ const SimulationApp = () => {
     }; 
   }
   
+  // Called when window is resized
   function resize() {
     const simWidth = twoRef.current.width / scale;
     const simHeight = twoRef.current.height / scale;
     systemRef.current.updateBounds(simWidth, simHeight);
   }
 
+  // Called whenever animation frame is requested
   function update() {
     // stats.begin();
 
@@ -68,16 +68,29 @@ const SimulationApp = () => {
     
     // stats.end();
   }
+
   function click() {
     systemRef.current.attractParticles(vec2.fromValues(0, 0), 200); //20);
   }
+
+  function setCharge(charge:number) {
+    systemRef.current.setCharge(charge);
+  }
+
   return (
     <div>
+      <Card title="Parameters" className="control-panel">
+        <Button type="primary" onClick={click}>
+          Test
+        </Button>
+        <div className="charge-slider">
+          <MinusCircleOutlined />
+          <Slider defaultValue={-1.0} min={-2.0} max={2.0} step={0.01} onChange={setCharge}/>
+          <PlusCircleOutlined />
+        </div>
+      </Card>
       <div>
-        <Button type="primary" style={{ position: 'fixed', zIndex:1}} onClick={click}>Test</Button>
-      </div>
-      <div>
-        <div className="stage" ref={ref} />
+        <div className="stage" ref={stageRef} />
       </div>
     </div>
   );

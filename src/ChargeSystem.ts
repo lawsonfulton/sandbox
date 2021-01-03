@@ -81,6 +81,10 @@ export class ChargeSystem {
     this.bounds = this.getBounds(width, height);
   }
 
+  setCharge(charge: number) {
+    this.charge.fill(charge);
+  }
+
   attractParticles(point: vec2, strength: number) {
     for (let i = 0; i < this.nParts; i++) {
       const f = vec2.create();
@@ -93,6 +97,38 @@ export class ChargeSystem {
   }
 
   applyCoulombForces() {
+    // Need to use fast multipole method for this part
+    // for (let i = 0; i < this.nParts; i++) {
+    //   const closeParts = this.spatial.getParticles(
+    //     this.pos,
+    //     this.pos[i],
+    //     100,
+    //   );
+
+    //   const qi = this.charge[i];
+    //   for (const j of closeParts) {
+      //     if (j !== i) {
+        //       const qj = this.charge[j];
+        
+        //       const magnitude =
+        //         ((qi * qj) / vec2.sqrDist(this.pos[i], this.pos[j])) * 50;
+        
+        //       const offset = vec2.create();
+        //       vec2.sub(offset, this.pos[j], this.pos[i]); // vec from pi to pj
+        //       vec2.normalize(offset, offset);
+        
+        //       const fi = vec2.create(); // force acting on pi
+        //       vec2.scale(fi, offset, -magnitude);
+        
+        //       const fj = vec2.create(); // force acting on pi
+        //       vec2.scale(fj, offset, magnitude);
+        
+        //       vec2.add(this.force[i], this.force[i], fi);
+        //       vec2.add(this.force[j], this.force[j], fj);
+        //     }
+        //   }
+        // }
+        
     for (let i = 0; i < this.nParts; i++) {
       const qi = this.charge[i];
 
