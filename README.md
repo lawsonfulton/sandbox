@@ -1,4 +1,13 @@
-# Charges
+# sandbox
+```
+yarn install
+yarn start
+```
+
+## synchrony
+Brain?
+
+## charges
 
 A fun simulation accelerated with spatial hashing.
 
